@@ -10,6 +10,7 @@ export default function Home() {
 
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
+
   const [nome, setNome] = useState('')
   const [cargo, setCargo] =
     useState('vendedor')
@@ -269,13 +270,6 @@ export default function Home() {
           </h1>
 
           <div className="flex flex-col gap-4">
-            <input
-              type="text"
-              placeholder="Seu nome"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
-            />
 
             <input
               type="email"
@@ -293,26 +287,6 @@ export default function Home() {
               className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
             />
 
-            <select
-              value={cargo}
-              onChange={(e) =>
-                setCargo(e.target.value)
-              }
-              className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
-            >
-              <option value="vendedor">
-                Vendedor
-              </option>
-
-              <option value="entregador">
-                Entregador
-              </option>
-
-              <option value="master">
-                Master
-              </option>
-            </select>
-
             <button
               onClick={login}
               className="rounded-lg bg-green-600 p-3 font-bold transition hover:bg-green-700"
@@ -320,12 +294,6 @@ export default function Home() {
               Entrar
             </button>
 
-            <button
-              onClick={cadastrar}
-              className="rounded-lg bg-blue-600 p-3 font-bold transition hover:bg-blue-700"
-            >
-              Criar conta
-            </button>
           </div>
         </div>
       </main>
@@ -338,8 +306,7 @@ export default function Home() {
 
       <div className="hidden w-64 flex-col bg-zinc-950 p-6 md:flex">
         <h2 className="mb-10 text-3xl font-bold">
-          - JL Entregas - 
-          beta
+          - JL Entregas - beta
         </h2>
       </div>
 
@@ -599,6 +566,7 @@ export default function Home() {
                         >
                           Não entregue
                         </button>
+
                         <button
                           onClick={() => {
                             setEntregaSelecionada(
@@ -632,7 +600,6 @@ export default function Home() {
                           Editar
                         </button>
 
-
                         {perfil?.cargo === 'master' && (
                           <button
                             onClick={() => {
@@ -649,17 +616,18 @@ export default function Home() {
                         )}
 
                         <span
-                          className={`ml-auto rounded-full px-3 py-1 text-sm font-bold ${entrega.status ===
+                          className={`ml-auto rounded-full px-3 py-1 text-sm font-bold ${
+                            entrega.status ===
                             'Entregue'
-                            ? 'bg-green-600'
-                            : entrega.status ===
-                              'Em rota'
-                              ? 'bg-blue-600'
+                              ? 'bg-green-600'
                               : entrega.status ===
-                                'Não entregue'
-                                ? 'bg-red-600'
-                                : 'bg-yellow-500 text-black'
-                            }`}
+                                'Em rota'
+                                ? 'bg-blue-600'
+                                : entrega.status ===
+                                  'Não entregue'
+                                  ? 'bg-red-600'
+                                  : 'bg-yellow-500 text-black'
+                          }`}
                         >
                           {entrega.status}
                         </span>
@@ -675,6 +643,7 @@ export default function Home() {
           </div>
         </div>
       </div>
+
       {modalExcluir && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-md rounded-2xl bg-zinc-800 p-6 shadow-2xl">
