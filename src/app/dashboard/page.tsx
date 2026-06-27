@@ -1,19 +1,21 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 import toast, { Toaster } from 'react-hot-toast'
+import { supabase } from '@/lib/supabase'
+import MenuLateral from '@/components/MenuLateral'
+import CardsDashboard from '@/components/dashboard/CardsDashboard'
+import FormEntrega from '@/components/dashboard/FormEntrega'
+import ListaEntregas from '@/components/dashboard/ListaEntregas'
+import ModalEditarEntrega from '@/components/dashboard/ModalEditarEntrega'
+import ModalExcluirEntrega from '@/components/dashboard/ModalExcluirEntrega'
 
 export default function Home() {
+  const router = useRouter()
+
   const [usuario, setUsuario] = useState<any>(null)
   const [perfil, setPerfil] = useState<any>(null)
-
-  const [email, setEmail] = useState('')
-  const [senha, setSenha] = useState('')
-
-  const [nome, setNome] = useState('')
-  const [cargo, setCargo] =
-    useState('vendedor')
 
   const [cliente, setCliente] = useState('')
   const [endereco, setEndereco] = useState('')
@@ -23,17 +25,21 @@ export default function Home() {
   const [observacao, setObservacao] =
     useState('')
 
-  const [entregas, setEntregas] = useState<any[]>([])
-  const [pesquisa, setPesquisa] = useState('')
+  const [entregas, setEntregas] =
+    useState<any[]>([])
+
+  const [pesquisa, setPesquisa] =
+    useState('')
+
+  const [modalEditar, setModalEditar] =
+    useState(false)
 
   const [modalExcluir, setModalExcluir] =
     useState(false)
 
-  const [entregaSelecionada, setEntregaSelecionada] =
+  const [entregaSelecionada,
+    setEntregaSelecionada] =
     useState<any>(null)
-
-  const [modalEditar, setModalEditar] =
-    useState(false)
 
   const [novoCliente, setNovoCliente] =
     useState('')
@@ -44,13 +50,15 @@ export default function Home() {
   const [novoProduto, setNovoProduto] =
     useState('')
 
-  const [novoCodigoPedido, setNovoCodigoPedido] =
+  const [novoCodigoPedido,
+    setNovoCodigoPedido] =
     useState('')
 
-  const [novaObservacao, setNovaObservacao] =
+  const [novaObservacao,
+    setNovaObservacao] =
     useState('')
 
-  useEffect(() => {
+    useEffect(() => {
     verificarUsuario()
 
     const {
@@ -59,17 +67,20 @@ export default function Home() {
       async (_event, session) => {
         setUsuario(session?.user ?? null)
 
-        if (session?.user) {
-          buscarEntregas()
-
-          const { data } = await supabase
-            .from('perfis')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-
-          setPerfil(data)
+        if (!session?.user) {
+          router.push('/login')
+          return
         }
+
+        buscarEntregas()
+
+        const { data } = await supabase
+          .from('perfis')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+
+        setPerfil(data)
       }
     )
 
@@ -83,70 +94,33 @@ export default function Home() {
       data: { user },
     } = await supabase.auth.getUser()
 
+    if (!user) {
+      router.push('/login')
+      return
+    }
+
     setUsuario(user)
 
-    if (user) {
-      buscarEntregas()
+    buscarEntregas()
 
-      const { data } = await supabase
-        .from('perfis')
-        .select('*')
-        .eq('id', user.id)
-        .single()
+    const { data } = await supabase
+      .from('perfis')
+      .select('*')
+      .eq('id', user.id)
+      .single()
 
-      setPerfil(data)
-    }
+    setPerfil(data)
   }
 
-  async function cadastrar() {
-    const { data, error } =
-      await supabase.auth.signUp({
-        email,
-        password: senha,
-      })
-
-    if (error) {
-      toast.error(error.message)
-      return
-    }
-
-    const user = data.user
-
-    if (user) {
-      await supabase.from('perfis').insert([
-        {
-          id: user.id,
-          nome,
-          cargo,
-        },
-      ])
-    }
-
-    toast.success('Usuário cadastrado!')
-  }
-
-  async function login() {
-    const { error } =
-      await supabase.auth.signInWithPassword({
-        email,
-        password: senha,
-      })
-
-    if (error) {
-      toast.error(error.message)
-      return
-    }
-
-    toast.success('Login realizado!')
-  }
-
-  async function logout() {
+    async function logout() {
     await supabase.auth.signOut()
-
-    toast.success('Logout realizado!')
 
     setUsuario(null)
     setPerfil(null)
+
+    toast.success('Logout realizado!')
+
+    router.push('/login')
   }
 
   async function buscarEntregas() {
@@ -156,11 +130,42 @@ export default function Home() {
       .order('id', { ascending: false })
 
     if (error) {
-      console.log(error)
+      console.error(error)
+      toast.error('Erro ao buscar entregas')
       return
     }
 
-    setEntregas(data)
+    setEntregas(data || [])
+  }
+
+  async function cadastrarEntrega() {
+    const { error } = await supabase
+      .from('entregas')
+      .insert([
+        {
+          cliente,
+          endereco,
+          produto,
+          codigo_pedido: codigoPedido,
+          observacao,
+          status: 'Pendente',
+        },
+      ])
+
+    if (error) {
+      toast.error('Erro ao cadastrar entrega')
+      return
+    }
+
+    toast.success('Entrega cadastrada!')
+
+    setCliente('')
+    setEndereco('')
+    setProduto('')
+    setCodigoPedido('')
+    setObservacao('')
+
+    buscarEntregas()
   }
 
   async function atualizarStatus(
@@ -178,26 +183,6 @@ export default function Home() {
     }
 
     toast.success('Status atualizado!')
-    buscarEntregas()
-  }
-
-  async function excluirEntrega() {
-    if (!entregaSelecionada) return
-
-    const { error } = await supabase
-      .from('entregas')
-      .delete()
-      .eq('id', entregaSelecionada.id)
-
-    if (error) {
-      toast.error('Erro ao excluir')
-      return
-    }
-
-    toast.success('Entrega excluída!')
-
-    setModalExcluir(false)
-    setEntregaSelecionada(null)
 
     buscarEntregas()
   }
@@ -221,7 +206,7 @@ export default function Home() {
       return
     }
 
-    toast.success('Entrega editada!')
+    toast.success('Entrega atualizada!')
 
     setModalEditar(false)
     setEntregaSelecionada(null)
@@ -229,542 +214,117 @@ export default function Home() {
     buscarEntregas()
   }
 
-  async function cadastrarEntrega() {
+  async function excluirEntrega() {
+    if (!entregaSelecionada) return
+
     const { error } = await supabase
       .from('entregas')
-      .insert([
-        {
-          cliente,
-          endereco,
-          produto,
-          codigo_pedido: codigoPedido,
-          observacao,
-          status: 'Pendente',
-        },
-      ])
+      .delete()
+      .eq('id', entregaSelecionada.id)
 
     if (error) {
-      toast.error('Erro ao cadastrar')
+      toast.error('Erro ao excluir entrega')
       return
     }
 
-    toast.success('Entrega cadastrada!')
+    toast.success('Entrega excluída!')
+
+    setModalExcluir(false)
+    setEntregaSelecionada(null)
 
     buscarEntregas()
-
-    setCliente('')
-    setEndereco('')
-    setProduto('')
-    setCodigoPedido('')
-    setObservacao('')
-  }
-
-  if (!usuario) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-zinc-900 p-8 text-white">
-        <Toaster position="top-right" />
-
-        <div className="w-full max-w-md rounded-2xl bg-zinc-800 p-8 shadow-2xl">
-          <h1 className="mb-8 text-center text-4xl font-bold">
-            JL Entregas 🚚
-          </h1>
-
-          <div className="flex flex-col gap-4">
-
-            <input
-              type="email"
-              placeholder="Seu e-mail"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
-            />
-
-            <input
-              type="password"
-              placeholder="Sua senha"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
-            />
-
-            <button
-              onClick={login}
-              className="rounded-lg bg-green-600 p-3 font-bold transition hover:bg-green-700"
-            >
-              Entrar
-            </button>
-
-          </div>
-        </div>
-      </main>
-    )
   }
 
   return (
     <main className="flex min-h-screen bg-zinc-900 text-white">
       <Toaster position="top-right" />
 
-      <div className="hidden w-64 flex-col bg-zinc-950 p-6 md:flex">
-        <h2 className="mb-10 text-3xl font-bold">
-          - JL Entregas - beta
-        </h2>
-      </div>
 
-      <div className="flex-1 p-8">
-        <div className="mx-auto max-w-6xl">
 
-          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-3xl md:text-5xl font-bold">
-                Sistema JL Entregas 🚚
-              </h1>
+      <div className="mx-auto max-w-6xl">
 
-              <p className="mt-2 text-zinc-400">
-                Cargo: {perfil?.cargo}
-              </p>
-            </div>
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl md:text-5xl font-bold">
+              Sistema JL Entregas 🚚
+            </h1>
 
-            <button
-              onClick={logout}
-              className="rounded-lg bg-red-600 px-4 py-2 font-bold transition hover:bg-red-700"
-            >
-              Sair
-            </button>
-          </div>
-
-          <div className="mb-8 grid gap-4 md:grid-cols-5">
-
-            <div className="rounded-2xl bg-zinc-800 p-5 shadow-xl">
-              <p>Total</p>
-
-              <h2 className="mt-2 text-4xl font-bold">
-                {entregas.length}
-              </h2>
-            </div>
-
-            <div className="rounded-2xl bg-yellow-600 p-5 shadow-xl">
-              <p>Pendentes</p>
-
-              <h2 className="mt-2 text-4xl font-bold">
-                {
-                  entregas.filter(
-                    (e) => e.status === 'Pendente'
-                  ).length
-                }
-              </h2>
-            </div>
-
-            <div className="rounded-2xl bg-blue-600 p-5 shadow-xl">
-              <p>Em rota</p>
-
-              <h2 className="mt-2 text-4xl font-bold">
-                {
-                  entregas.filter(
-                    (e) => e.status === 'Em rota'
-                  ).length
-                }
-              </h2>
-            </div>
-
-            <div className="rounded-2xl bg-green-600 p-5 shadow-xl">
-              <p>Entregues</p>
-
-              <h2 className="mt-2 text-4xl font-bold">
-                {
-                  entregas.filter(
-                    (e) => e.status === 'Entregue'
-                  ).length
-                }
-              </h2>
-            </div>
-
-            <div className="rounded-2xl bg-red-600 p-5 shadow-xl">
-              <p>Não entregues</p>
-
-              <h2 className="mt-2 text-4xl font-bold">
-                {
-                  entregas.filter(
-                    (e) =>
-                      e.status === 'Não entregue'
-                  ).length
-                }
-              </h2>
-            </div>
-
-          </div>
-
-          <div className="grid gap-8 lg:grid-cols-2">
-
-            {perfil?.cargo !== 'entregador' && (
-              <div className="rounded-2xl bg-zinc-800 p-6 shadow-xl">
-
-                <h2 className="mb-6 text-2xl font-bold">
-                  Nova entrega
-                </h2>
-
-                <div className="flex flex-col gap-4">
-
-                  <input
-                    type="text"
-                    placeholder="Nome do cliente"
-                    value={cliente}
-                    onChange={(e) =>
-                      setCliente(e.target.value)
-                    }
-                    className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Endereço"
-                    value={endereco}
-                    onChange={(e) =>
-                      setEndereco(e.target.value)
-                    }
-                    className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Produto"
-                    value={produto}
-                    onChange={(e) =>
-                      setProduto(e.target.value)
-                    }
-                    className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Código do pedido"
-                    value={codigoPedido}
-                    onChange={(e) =>
-                      setCodigoPedido(e.target.value)
-                    }
-                    className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Observação"
-                    value={observacao}
-                    onChange={(e) =>
-                      setObservacao(e.target.value)
-                    }
-                    className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
-                  />
-
-                  <button
-                    onClick={cadastrarEntrega}
-                    className="rounded-lg bg-green-600 p-3 font-bold transition hover:bg-green-700"
-                  >
-                    Cadastrar entrega
-                  </button>
-
-                </div>
-              </div>
-            )}
-
-            <div className="rounded-2xl bg-zinc-800 p-6 shadow-xl">
-
-              <h2 className="mb-6 text-2xl font-bold">
-                Entregas cadastradas
-              </h2>
-
-              <input
-                type="text"
-                placeholder="Pesquisar entrega..."
-                value={pesquisa}
-                onChange={(e) =>
-                  setPesquisa(e.target.value)
-                }
-                className="mb-6 w-full rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
-              />
-
-              <div className="flex max-h-[600px] flex-col gap-4 overflow-y-auto">
-
-                {entregas
-                  .filter((entrega) => {
-                    return (
-                      entrega.cliente
-                        .toLowerCase()
-                        .includes(
-                          pesquisa.toLowerCase()
-                        ) ||
-                      entrega.produto
-                        .toLowerCase()
-                        .includes(
-                          pesquisa.toLowerCase()
-                        )
-                    )
-                  })
-                  .map((entrega) => (
-                    <div
-                      key={entrega.id}
-                      className="rounded-xl border border-zinc-700 bg-zinc-900 p-4"
-                    >
-
-                      <p>
-                        <strong>Cliente:</strong>{' '}
-                        {entrega.cliente}
-                      </p>
-
-                      <p>
-                        <strong>Endereço:</strong>{' '}
-                        {entrega.endereco}
-                      </p>
-
-                      <p>
-                        <strong>Produto:</strong>{' '}
-                        {entrega.produto}
-                      </p>
-
-                      <p>
-                        <strong>Código:</strong>{' '}
-                        {entrega.codigo_pedido}
-                      </p>
-
-                      <p>
-                        <strong>Observação:</strong>{' '}
-                        {entrega.observacao}
-                      </p>
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-
-                        <button
-                          onClick={() =>
-                            atualizarStatus(
-                              entrega.id,
-                              'Em rota'
-                            )
-                          }
-                          className="rounded-lg bg-blue-600 px-3 py-1 text-sm font-bold transition hover:bg-blue-700"
-                        >
-                          Em rota
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            atualizarStatus(
-                              entrega.id,
-                              'Entregue'
-                            )
-                          }
-                          className="rounded-lg bg-green-600 px-3 py-1 text-sm font-bold transition hover:bg-green-700"
-                        >
-                          Entregue
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            atualizarStatus(
-                              entrega.id,
-                              'Não entregue'
-                            )
-                          }
-                          className="rounded-lg bg-red-600 px-3 py-1 text-sm font-bold transition hover:bg-red-700"
-                        >
-                          Não entregue
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setEntregaSelecionada(
-                              entrega
-                            )
-
-                            setNovoCliente(
-                              entrega.cliente
-                            )
-
-                            setNovoEndereco(
-                              entrega.endereco
-                            )
-
-                            setNovoProduto(
-                              entrega.produto
-                            )
-
-                            setNovoCodigoPedido(
-                              entrega.codigo_pedido
-                            )
-
-                            setNovaObservacao(
-                              entrega.observacao
-                            )
-
-                            setModalEditar(true)
-                          }}
-                          className="rounded-lg bg-yellow-600 px-3 py-1 text-sm font-bold transition hover:bg-yellow-700"
-                        >
-                          Editar
-                        </button>
-
-                        {perfil?.cargo === 'master' && (
-                          <button
-                            onClick={() => {
-                              setEntregaSelecionada(
-                                entrega
-                              )
-
-                              setModalExcluir(true)
-                            }}
-                            className="rounded-lg bg-zinc-700 px-3 py-1 text-sm font-bold transition hover:bg-zinc-600"
-                          >
-                            Excluir
-                          </button>
-                        )}
-
-                        <span
-                          className={`ml-auto rounded-full px-3 py-1 text-sm font-bold ${
-                            entrega.status ===
-                            'Entregue'
-                              ? 'bg-green-600'
-                              : entrega.status ===
-                                'Em rota'
-                                ? 'bg-blue-600'
-                                : entrega.status ===
-                                  'Não entregue'
-                                  ? 'bg-red-600'
-                                  : 'bg-yellow-500 text-black'
-                          }`}
-                        >
-                          {entrega.status}
-                        </span>
-
-                      </div>
-
-                    </div>
-                  ))}
-
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </div>
-
-      {modalExcluir && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-zinc-800 p-6 shadow-2xl">
-            <h2 className="mb-4 text-2xl font-bold">
-              Excluir entrega
-            </h2>
-
-            <p className="mb-6 text-zinc-300">
-              Deseja realmente excluir esta entrega?
+            <p className="mt-2 text-zinc-400">
+              Cargo: {perfil?.cargo}
             </p>
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setModalExcluir(false)
-                  setEntregaSelecionada(null)
-                }}
-                className="rounded-lg bg-zinc-700 px-4 py-2 font-bold"
-              >
-                Cancelar
-              </button>
-
-              <button
-                onClick={excluirEntrega}
-                className="rounded-lg bg-red-600 px-4 py-2 font-bold"
-              >
-                Excluir
-              </button>
-            </div>
           </div>
+
+
         </div>
-      )}
 
-      {modalEditar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-zinc-800 p-6 shadow-2xl">
-            <h2 className="mb-6 text-2xl font-bold">
-              Editar entrega
-            </h2>
+        <CardsDashboard entregas={entregas} />
 
-            <div className="flex flex-col gap-4">
+        <div className="grid gap-8 lg:grid-cols-2">
 
-              <input
-                type="text"
-                placeholder="Cliente"
-                value={novoCliente}
-                onChange={(e) =>
-                  setNovoCliente(e.target.value)
-                }
-                className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
-              />
 
-              <input
-                type="text"
-                placeholder="Endereço"
-                value={novoEndereco}
-                onChange={(e) =>
-                  setNovoEndereco(e.target.value)
-                }
-                className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
-              />
+          {perfil?.cargo !== 'entregador' && (
+            <FormEntrega
+              cliente={cliente}
+              endereco={endereco}
+              produto={produto}
+              codigoPedido={codigoPedido}
+              observacao={observacao}
+              setCliente={setCliente}
+              setEndereco={setEndereco}
+              setProduto={setProduto}
+              setCodigoPedido={setCodigoPedido}
+              setObservacao={setObservacao}
+              cadastrarEntrega={cadastrarEntrega}
+            />
+          )}
 
-              <input
-                type="text"
-                placeholder="Produto"
-                value={novoProduto}
-                onChange={(e) =>
-                  setNovoProduto(e.target.value)
-                }
-                className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
-              />
+          <ListaEntregas
+            entregas={entregas}
+            pesquisa={pesquisa}
+            setPesquisa={setPesquisa}
+            perfil={perfil}
+            atualizarStatus={atualizarStatus}
+            editarEntrega={(entrega) => {
+              setEntregaSelecionada(entrega)
+              setNovoCliente(entrega.cliente)
+              setNovoEndereco(entrega.endereco)
+              setNovoProduto(entrega.produto)
+              setNovoCodigoPedido(entrega.codigo_pedido)
+              setNovaObservacao(entrega.observacao)
+              setModalEditar(true)
+            }}
+            excluirEntrega={(entrega) => {
+              setEntregaSelecionada(entrega)
+              setModalExcluir(true)
+            }}
+          />
 
-              <input
-                type="text"
-                placeholder="Código do pedido"
-                value={novoCodigoPedido}
-                onChange={(e) =>
-                  setNovoCodigoPedido(
-                    e.target.value
-                  )
-                }
-                className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
-              />
-
-              <input
-                type="text"
-                placeholder="Observação"
-                value={novaObservacao}
-                onChange={(e) =>
-                  setNovaObservacao(
-                    e.target.value
-                  )
-                }
-                className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
-              />
-
-            </div>
-
-            <div className="mt-6 flex justify-end gap-3">
-
-              <button
-                onClick={() => {
-                  setModalEditar(false)
-                  setEntregaSelecionada(null)
-                }}
-                className="rounded-lg bg-zinc-700 px-4 py-2 font-bold"
-              >
-                Cancelar
-              </button>
-
-              <button
-                onClick={editarEntrega}
-                className="rounded-lg bg-yellow-600 px-4 py-2 font-bold"
-              >
-                Salvar
-              </button>
-
-            </div>
-          </div>
         </div>
-      )}
+      </div>
+
+      <ModalExcluirEntrega
+        modalExcluir={modalExcluir}
+        setModalExcluir={setModalExcluir}
+        setEntregaSelecionada={setEntregaSelecionada}
+        excluirEntrega={excluirEntrega}
+      />
+
+      <ModalEditarEntrega
+        modalEditar={modalEditar}
+        novoCliente={novoCliente}
+        novoEndereco={novoEndereco}
+        novoProduto={novoProduto}
+        novoCodigoPedido={novoCodigoPedido}
+        novaObservacao={novaObservacao}
+        setNovoCliente={setNovoCliente}
+        setNovoEndereco={setNovoEndereco}
+        setNovoProduto={setNovoProduto}
+        setNovoCodigoPedido={setNovoCodigoPedido}
+        setNovaObservacao={setNovaObservacao}
+        setModalEditar={setModalEditar}
+        setEntregaSelecionada={setEntregaSelecionada}
+        editarEntrega={editarEntrega}
+      />
     </main>
   )
 }

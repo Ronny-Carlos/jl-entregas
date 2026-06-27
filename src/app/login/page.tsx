@@ -12,21 +12,50 @@ export default function LoginPage() {
   const [senha, setSenha] = useState('')
 
   async function login() {
-    const { error } =
-      await supabase.auth.signInWithPassword({
-        email,
-        password: senha,
-      })
+  const {
+    data,
+    error,
+  } = await supabase.auth.signInWithPassword({
+    email,
+    password: senha,
+  })
 
-    if (error) {
-      toast.error(error.message)
-      return
-    }
-
-    toast.success('Login realizado!')
-
-    router.push('/dashboard')
+  if (error) {
+    toast.error(error.message)
+    return
   }
+
+  const user = data.user
+
+  const { data: perfil, error: perfilError } =
+    await supabase
+      .from('perfis')
+      .select('ativo')
+      .eq('id', user.id)
+      .single()
+
+  if (perfilError) {
+    await supabase.auth.signOut()
+
+    toast.error('Erro ao verificar usuário.')
+
+    return
+  }
+
+  if (!perfil?.ativo) {
+    await supabase.auth.signOut()
+
+    toast.error(
+      'Seu usuário está desativado. Entre em contato com o administrador.'
+    )
+
+    return
+  }
+
+  toast.success('Login realizado!')
+
+  router.push('/dashboard')
+}
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-zinc-900 p-8 text-white">
