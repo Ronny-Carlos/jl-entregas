@@ -6,7 +6,7 @@ type Props = {
   pesquisa: string
   setPesquisa: (value: string) => void
   perfil: any
-  atualizarStatus: (id: string, status: string) => void
+  atualizarStatus: (id: number, status: string) => Promise<void>
   editarEntrega: (entrega: any) => void
   excluirEntrega: (entrega: any) => void
 }
@@ -22,7 +22,6 @@ export default function ListaEntregas({
 }: Props) {
   return (
     <div className="rounded-2xl bg-zinc-800 p-6 shadow-xl">
-
       <h2 className="mb-6 text-2xl font-bold">
         Entregas cadastradas
       </h2>
@@ -33,15 +32,14 @@ export default function ListaEntregas({
       />
 
       <div className="flex max-h-[600px] flex-col gap-4 overflow-y-auto">
-
         {entregas
           .filter((entrega) => {
             return (
               entrega.cliente
-                .toLowerCase()
+                ?.toLowerCase()
                 .includes(pesquisa.toLowerCase()) ||
               entrega.produto
-                .toLowerCase()
+                ?.toLowerCase()
                 .includes(pesquisa.toLowerCase())
             )
           })
@@ -55,9 +53,7 @@ export default function ListaEntregas({
               excluirEntrega={excluirEntrega}
             />
           ))}
-
       </div>
-
     </div>
   )
 }
