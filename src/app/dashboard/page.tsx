@@ -59,35 +59,55 @@ export default function Home() {
     useState('')
 
     useEffect(() => {
-    verificarUsuario()
+  let ativo = true
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setUsuario(session?.user ?? null)
+  async function carregarDados(userId: string) {
+    const { data } = await supabase
+      .from('perfis')
+      .select('*')
+      .eq('id', userId)
+      .single()
 
-        if (!session?.user) {
-          router.push('/login')
-          return
-        }
+    if (!ativo) return
 
-        buscarEntregas()
+    setPerfil(data)
+    await buscarEntregas()
+  }
 
-        const { data } = await supabase
-          .from('perfis')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((event, session) => {
+    if (!ativo) return
 
-        setPerfil(data)
-      }
-    )
-
-    return () => {
-      subscription.unsubscribe()
+    if (!session?.user) {
+      setUsuario(null)
+      setPerfil(null)
+      setEntregas([])
+      router.push('/login')
+      return
     }
-  }, [])
+
+    setUsuario(session.user)
+
+    if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+      if (timeoutId) clearTimeout(timeoutId)
+
+      timeoutId = setTimeout(() => {
+        if (!ativo) return
+        void carregarDados(session.user.id)
+      }, 0)
+    }
+  })
+
+  return () => {
+    ativo = false
+
+    if (timeoutId) clearTimeout(timeoutId)
+
+    subscription.unsubscribe()
+  }
+}, [router])
 
   async function verificarUsuario() {
     const {
