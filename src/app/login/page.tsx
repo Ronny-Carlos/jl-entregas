@@ -64,7 +64,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md rounded-2xl bg-zinc-800 p-8 shadow-2xl">
 
         <h1 className="mb-8 text-center text-4xl font-bold">
-          JL Entregas 🚚
+          4RP Entregas 🚚
         </h1>
 
         <div className="flex flex-col gap-4">
