@@ -26,7 +26,7 @@ export default function MenuLateral({
 
         <div className="p-6 border-b border-zinc-800">
           <h1 className="text-2xl font-bold text-white">
-            JL Entregas
+            4RP Entregas
           </h1>
 
           <p className="text-zinc-400 text-sm mt-1">
