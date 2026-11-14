@@ -1,3 +1,4 @@
+
 type Props = {
   cliente: string
   endereco: string
@@ -27,27 +28,38 @@ export default function FormEntrega({
   setObservacao,
   cadastrarEntrega,
 }: Props) {
+  const estiloInput =
+    "w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3.5 text-sm text-white placeholder:text-zinc-500 outline-none transition duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+
   return (
-    <div className="rounded-2xl bg-zinc-800 p-6 shadow-xl">
-      <h2 className="mb-6 text-2xl font-bold">
-        Nova entrega
-      </h2>
+    <div className="rounded-2xl border border-zinc-700/70 bg-zinc-800 p-6 shadow-lg">
+
+      <div className="mb-6">
+        <h2 className="text-xl font-bold text-white">
+          Nova entrega
+        </h2>
+
+        <p className="mt-1 text-sm text-zinc-400">
+          Preencha os dados para cadastrar uma entrega.
+        </p>
+      </div>
 
       <div className="flex flex-col gap-4">
+
         <input
           type="text"
           placeholder="Nome do cliente"
           value={cliente}
           onChange={(e) => setCliente(e.target.value)}
-          className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
+          className={estiloInput}
         />
 
         <input
           type="text"
-          placeholder="Endereço"
+          placeholder="Endereço de entrega"
           value={endereco}
           onChange={(e) => setEndereco(e.target.value)}
-          className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
+          className={estiloInput}
         />
 
         <input
@@ -55,7 +67,7 @@ export default function FormEntrega({
           placeholder="Produto"
           value={produto}
           onChange={(e) => setProduto(e.target.value)}
-          className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
+          className={estiloInput}
         />
 
         <input
@@ -63,23 +75,24 @@ export default function FormEntrega({
           placeholder="Código do pedido"
           value={codigoPedido}
           onChange={(e) => setCodigoPedido(e.target.value)}
-          className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
+          className={estiloInput}
         />
 
         <input
           type="text"
-          placeholder="Observação"
+          placeholder="Observação (opcional)"
           value={observacao}
           onChange={(e) => setObservacao(e.target.value)}
-          className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none"
+          className={estiloInput}
         />
 
         <button
           onClick={cadastrarEntrega}
-          className="rounded-lg bg-green-600 p-3 font-bold transition hover:bg-green-700"
+          className="mt-2 w-full rounded-xl bg-green-600 px-4 py-3.5 font-semibold text-white shadow-lg shadow-green-900/20 transition duration-200 hover:bg-green-500 active:scale-[0.98]"
         >
           Cadastrar entrega
         </button>
+
       </div>
     </div>
   )

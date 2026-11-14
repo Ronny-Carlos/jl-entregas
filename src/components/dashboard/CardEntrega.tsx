@@ -1,3 +1,4 @@
+
 import StatusEntrega from './StatusEntrega'
 
 type Props = {
@@ -15,53 +16,95 @@ export default function CardEntrega({
   editarEntrega,
   excluirEntrega,
 }: Props) {
+  const estiloBotao =
+    "rounded-lg px-3 py-2 text-xs font-semibold text-white transition duration-200 hover:brightness-110 active:scale-95"
+
   return (
-    <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-4">
-      <p>
-        <strong>Cliente:</strong> {entrega.cliente}
-      </p>
+    <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-5 transition duration-200 hover:border-zinc-600">
 
-      <p>
-        <strong>Endereço:</strong> {entrega.endereco}
-      </p>
+      {/* Cabeçalho */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+            Cliente
+          </p>
 
-      <p>
-        <strong>Produto:</strong> {entrega.produto}
-      </p>
+          <h3 className="mt-1 text-base font-bold text-white">
+            {entrega.cliente}
+          </h3>
+        </div>
 
-      <p>
-        <strong>Código:</strong> {entrega.codigo_pedido}
-      </p>
+        <StatusEntrega status={entrega.status} />
+      </div>
 
-      <p>
-        <strong>Observação:</strong> {entrega.observacao}
-      </p>
+      {/* Informações da entrega */}
+      <div className="grid gap-3 sm:grid-cols-2">
 
-      <div className="mt-4 flex flex-wrap gap-2">
+        <div>
+          <p className="text-xs text-zinc-500">
+            Endereço
+          </p>
+          <p className="mt-1 text-sm text-zinc-200">
+            {entrega.endereco || 'Não informado'}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-xs text-zinc-500">
+            Produto
+          </p>
+          <p className="mt-1 text-sm text-zinc-200">
+            {entrega.produto || 'Não informado'}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-xs text-zinc-500">
+            Código do pedido
+          </p>
+          <p className="mt-1 text-sm text-zinc-200">
+            {entrega.codigo_pedido || 'Não informado'}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-xs text-zinc-500">
+            Observação
+          </p>
+          <p className="mt-1 text-sm text-zinc-200">
+            {entrega.observacao || 'Nenhuma observação'}
+          </p>
+        </div>
+
+      </div>
+
+      {/* Ações */}
+      <div className="mt-5 flex flex-wrap gap-2 border-t border-zinc-800 pt-4">
+
         <button
           onClick={() => atualizarStatus(entrega.id, 'Em rota')}
-          className="rounded-lg bg-blue-600 px-3 py-1 text-sm font-bold hover:bg-blue-700"
+          className={`${estiloBotao} bg-blue-600`}
         >
           Em rota
         </button>
 
         <button
           onClick={() => atualizarStatus(entrega.id, 'Entregue')}
-          className="rounded-lg bg-green-600 px-3 py-1 text-sm font-bold hover:bg-green-700"
+          className={`${estiloBotao} bg-green-600`}
         >
           Entregue
         </button>
 
         <button
           onClick={() => atualizarStatus(entrega.id, 'Não entregue')}
-          className="rounded-lg bg-red-600 px-3 py-1 text-sm font-bold hover:bg-red-700"
+          className={`${estiloBotao} bg-red-600`}
         >
           Não entregue
         </button>
 
         <button
           onClick={() => editarEntrega(entrega)}
-          className="rounded-lg bg-yellow-600 px-3 py-1 text-sm font-bold hover:bg-yellow-700"
+          className={`${estiloBotao} bg-yellow-600`}
         >
           Editar
         </button>
@@ -69,13 +112,12 @@ export default function CardEntrega({
         {perfil?.cargo === 'master' && (
           <button
             onClick={() => excluirEntrega(entrega)}
-            className="rounded-lg bg-zinc-700 px-3 py-1 text-sm font-bold hover:bg-zinc-600"
+            className={`${estiloBotao} bg-zinc-700 hover:bg-zinc-600`}
           >
             Excluir
           </button>
         )}
 
-        <StatusEntrega status={entrega.status} />
       </div>
     </div>
   )

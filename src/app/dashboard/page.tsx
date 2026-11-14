@@ -1,10 +1,10 @@
+
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast, { Toaster } from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
-import MenuLateral from '@/components/MenuLateral'
 import CardsDashboard from '@/components/dashboard/CardsDashboard'
 import FormEntrega from '@/components/dashboard/FormEntrega'
 import ListaEntregas from '@/components/dashboard/ListaEntregas'
@@ -20,94 +20,74 @@ export default function Home() {
   const [cliente, setCliente] = useState('')
   const [endereco, setEndereco] = useState('')
   const [produto, setProduto] = useState('')
-  const [codigoPedido, setCodigoPedido] =
-    useState('')
-  const [observacao, setObservacao] =
-    useState('')
+  const [codigoPedido, setCodigoPedido] = useState('')
+  const [observacao, setObservacao] = useState('')
 
-  const [entregas, setEntregas] =
-    useState<any[]>([])
+  const [entregas, setEntregas] = useState<any[]>([])
+  const [pesquisa, setPesquisa] = useState('')
 
-  const [pesquisa, setPesquisa] =
-    useState('')
+  const [modalNovaEntrega, setModalNovaEntrega] = useState(false)
+  const [modalEditar, setModalEditar] = useState(false)
+  const [modalExcluir, setModalExcluir] = useState(false)
 
-  const [modalEditar, setModalEditar] =
-    useState(false)
+  const [entregaSelecionada, setEntregaSelecionada] = useState<any>(null)
 
-  const [modalExcluir, setModalExcluir] =
-    useState(false)
+  const [novoCliente, setNovoCliente] = useState('')
+  const [novoEndereco, setNovoEndereco] = useState('')
+  const [novoProduto, setNovoProduto] = useState('')
+  const [novoCodigoPedido, setNovoCodigoPedido] = useState('')
+  const [novaObservacao, setNovaObservacao] = useState('')
 
-  const [entregaSelecionada,
-    setEntregaSelecionada] =
-    useState<any>(null)
+  useEffect(() => {
+    let ativo = true
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
 
-  const [novoCliente, setNovoCliente] =
-    useState('')
+    async function carregarDados(userId: string) {
+      const { data } = await supabase
+        .from('perfis')
+        .select('*')
+        .eq('id', userId)
+        .single()
 
-  const [novoEndereco, setNovoEndereco] =
-    useState('')
+      if (!ativo) return
 
-  const [novoProduto, setNovoProduto] =
-    useState('')
-
-  const [novoCodigoPedido,
-    setNovoCodigoPedido] =
-    useState('')
-
-  const [novaObservacao,
-    setNovaObservacao] =
-    useState('')
-
-    useEffect(() => {
-  let ativo = true
-  let timeoutId: ReturnType<typeof setTimeout> | undefined
-
-  async function carregarDados(userId: string) {
-    const { data } = await supabase
-      .from('perfis')
-      .select('*')
-      .eq('id', userId)
-      .single()
-
-    if (!ativo) return
-
-    setPerfil(data)
-    await buscarEntregas()
-  }
-
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange((event, session) => {
-    if (!ativo) return
-
-    if (!session?.user) {
-      setUsuario(null)
-      setPerfil(null)
-      setEntregas([])
-      router.push('/login')
-      return
+      setPerfil(data)
+      await buscarEntregas()
     }
 
-    setUsuario(session.user)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!ativo) return
 
-    if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+      if (!session?.user) {
+        setUsuario(null)
+        setPerfil(null)
+        setEntregas([])
+        router.push('/login')
+        return
+      }
+
+      setUsuario(session.user)
+
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+        if (timeoutId) clearTimeout(timeoutId)
+
+        timeoutId = setTimeout(() => {
+          if (!ativo) return
+          void carregarDados(session.user.id)
+        }, 0)
+      }
+    })
+
+    return () => {
+      ativo = false
+
       if (timeoutId) clearTimeout(timeoutId)
 
-      timeoutId = setTimeout(() => {
-        if (!ativo) return
-        void carregarDados(session.user.id)
-      }, 0)
+      subscription.unsubscribe()
     }
-  })
-
-  return () => {
-    ativo = false
-
-    if (timeoutId) clearTimeout(timeoutId)
-
-    subscription.unsubscribe()
-  }
-}, [router])
+  }, [router])
 
   async function verificarUsuario() {
     const {
@@ -120,7 +100,6 @@ export default function Home() {
     }
 
     setUsuario(user)
-
     buscarEntregas()
 
     const { data } = await supabase
@@ -132,7 +111,7 @@ export default function Home() {
     setPerfil(data)
   }
 
-    async function logout() {
+  async function logout() {
     await supabase.auth.signOut()
 
     setUsuario(null)
@@ -185,13 +164,12 @@ export default function Home() {
     setCodigoPedido('')
     setObservacao('')
 
+    setModalNovaEntrega(false)
+
     buscarEntregas()
   }
 
-  async function atualizarStatus(
-    id: number,
-    status: string
-  ) {
+  async function atualizarStatus(id: number, status: string) {
     const { error } = await supabase
       .from('entregas')
       .update({ status })
@@ -256,16 +234,14 @@ export default function Home() {
   }
 
   return (
-    <main className="flex min-h-screen bg-zinc-900 text-white">
+    <main className="min-h-screen bg-zinc-900 text-white">
       <Toaster position="top-right" />
 
+      <div className="mx-auto max-w-7xl p-4 md:p-8">
 
-
-      <div className="mx-auto max-w-6xl">
-
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl md:text-5xl font-bold">
+            <h1 className="text-3xl font-bold md:text-5xl">
               4RP Entregas 🚚
             </h1>
 
@@ -274,15 +250,57 @@ export default function Home() {
             </p>
           </div>
 
-
+          {perfil?.cargo !== 'entregador' && (
+            <button
+              onClick={() => setModalNovaEntrega(true)}
+              className="rounded-xl bg-green-600 px-5 py-3 font-bold text-white transition hover:bg-green-700"
+            >
+              + Nova entrega
+            </button>
+          )}
         </div>
 
         <CardsDashboard entregas={entregas} />
 
-        <div className="grid gap-8 lg:grid-cols-2">
+        <ListaEntregas
+          entregas={entregas}
+          pesquisa={pesquisa}
+          setPesquisa={setPesquisa}
+          perfil={perfil}
+          atualizarStatus={atualizarStatus}
+          editarEntrega={(entrega) => {
+            setEntregaSelecionada(entrega)
+            setNovoCliente(entrega.cliente)
+            setNovoEndereco(entrega.endereco)
+            setNovoProduto(entrega.produto)
+            setNovoCodigoPedido(entrega.codigo_pedido)
+            setNovaObservacao(entrega.observacao)
+            setModalEditar(true)
+          }}
+          excluirEntrega={(entrega) => {
+            setEntregaSelecionada(entrega)
+            setModalExcluir(true)
+          }}
+        />
 
+      </div>
 
-          {perfil?.cargo !== 'entregador' && (
+      {modalNovaEntrega && perfil?.cargo !== 'entregador' && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setModalNovaEntrega(false)}
+        >
+          <div
+            className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setModalNovaEntrega(false)}
+              className="absolute right-4 top-4 z-10 rounded-lg bg-zinc-700 px-3 py-2 text-sm font-bold text-white hover:bg-zinc-600"
+            >
+              ✕ Fechar
+            </button>
+
             <FormEntrega
               cliente={cliente}
               endereco={endereco}
@@ -296,31 +314,9 @@ export default function Home() {
               setObservacao={setObservacao}
               cadastrarEntrega={cadastrarEntrega}
             />
-          )}
-
-          <ListaEntregas
-            entregas={entregas}
-            pesquisa={pesquisa}
-            setPesquisa={setPesquisa}
-            perfil={perfil}
-            atualizarStatus={atualizarStatus}
-            editarEntrega={(entrega) => {
-              setEntregaSelecionada(entrega)
-              setNovoCliente(entrega.cliente)
-              setNovoEndereco(entrega.endereco)
-              setNovoProduto(entrega.produto)
-              setNovoCodigoPedido(entrega.codigo_pedido)
-              setNovaObservacao(entrega.observacao)
-              setModalEditar(true)
-            }}
-            excluirEntrega={(entrega) => {
-              setEntregaSelecionada(entrega)
-              setModalExcluir(true)
-            }}
-          />
-
+          </div>
         </div>
-      </div>
+      )}
 
       <ModalExcluirEntrega
         modalExcluir={modalExcluir}
