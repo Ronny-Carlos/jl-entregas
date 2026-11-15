@@ -169,20 +169,39 @@ export default function Home() {
     buscarEntregas()
   }
 
-  async function atualizarStatus(id: number, status: string) {
-    const { error } = await supabase
-      .from('entregas')
-      .update({ status })
-      .eq('id', id)
+  // Atualiza o status e registra a justificativa, quando informada
+  async function atualizarStatus(
+    id: number,
+    status: string,
+    justificativa: string = ''
+  ) {
+    const motivo = justificativa.trim()
 
-    if (error) {
-      toast.error('Erro ao atualizar status')
+    if (
+      ['Não entregue', 'Cancelado'].includes(status) &&
+      !motivo
+    ) {
+      toast.error('Informe a justificativa para esta situação')
       return
     }
 
-    toast.success('Status atualizado!')
+    const { error } = await supabase
+      .from('entregas')
+      .update({
+        status,
+        justificativa_status: motivo || null,
+      })
+      .eq('id', id)
 
-    buscarEntregas()
+    if (error) {
+      console.error('Erro ao atualizar status:', error)
+      toast.error(error.message || 'Erro ao atualizar status')
+      return
+    }
+
+    toast.success('Status atualizado com sucesso!')
+
+    await buscarEntregas()
   }
 
   async function editarEntrega() {
@@ -238,7 +257,6 @@ export default function Home() {
       <Toaster position="top-right" />
 
       <div className="mx-auto max-w-7xl p-4 md:p-8">
-
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold md:text-5xl">
@@ -282,7 +300,6 @@ export default function Home() {
             setModalExcluir(true)
           }}
         />
-
       </div>
 
       {modalNovaEntrega && perfil?.cargo !== 'entregador' && (

@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -10,10 +9,22 @@ type Props = {
   pesquisa: string
   setPesquisa: (value: string) => void
   perfil: any
-  atualizarStatus: (id: number, status: string) => Promise<void>
+  atualizarStatus: (
+    id: number,
+    status: string,
+    justificativa?: string
+  ) => Promise<void>
   editarEntrega: (entrega: any) => void
   excluirEntrega: (entrega: any) => void
 }
+
+const opcoesStatus = [
+  'Em separação',
+  'Em rota',
+  'Entregue',
+  'Não entregue',
+  'Cancelado',
+]
 
 export default function ListaEntregas({
   entregas,
@@ -32,6 +43,10 @@ export default function ListaEntregas({
   const [carregandoHistorico, setCarregandoHistorico] = useState(false)
   const [erroHistorico, setErroHistorico] = useState(false)
 
+  const [statusSelecionado, setStatusSelecionado] = useState('')
+  const [justificativaStatus, setJustificativaStatus] = useState('')
+  const [atualizandoStatus, setAtualizandoStatus] = useState(false)
+
   // Mantém os dados da entrega selecionada atualizados
   useEffect(() => {
     if (!entregaSelecionada) return
@@ -46,6 +61,14 @@ export default function ListaEntregas({
       setEntregaSelecionada(null)
     }
   }, [entregas, entregaSelecionada?.id])
+
+  // Atualiza a opção selecionada quando o status da entrega mudar
+  useEffect(() => {
+    if (!entregaSelecionada) return
+
+    setStatusSelecionado(entregaSelecionada.status || '')
+    setJustificativaStatus('')
+  }, [entregaSelecionada?.id, entregaSelecionada?.status])
 
   // Busca o histórico da entrega selecionada
   useEffect(() => {
@@ -119,6 +142,33 @@ export default function ListaEntregas({
     }
   }, [entregaSelecionada?.id])
 
+  async function confirmarAtualizacaoStatus() {
+    if (!entregaSelecionada || !statusSelecionado) return
+
+    if (statusSelecionado === entregaSelecionada.status) return
+
+    const exigeJustificativa = [
+      'Não entregue',
+      'Cancelado',
+    ].includes(statusSelecionado)
+
+    if (exigeJustificativa && !justificativaStatus.trim()) {
+      return
+    }
+
+    setAtualizandoStatus(true)
+
+    try {
+      await atualizarStatus(
+        entregaSelecionada.id,
+        statusSelecionado,
+        justificativaStatus.trim()
+      )
+    } finally {
+      setAtualizandoStatus(false)
+    }
+  }
+
   const entregasFiltradas = entregas.filter((entrega) => {
     const termo = pesquisa.toLowerCase().trim()
 
@@ -135,6 +185,19 @@ export default function ListaEntregas({
   // Tela de detalhes da entrega
   if (entregaSelecionada) {
     const entrega = entregaSelecionada
+
+    const exigeJustificativa = [
+      'Não entregue',
+      'Cancelado',
+    ].includes(statusSelecionado)
+
+    const justificativaValida = justificativaStatus.trim().length > 0
+
+    const podeConfirmar =
+      statusSelecionado !== '' &&
+      statusSelecionado !== entrega.status &&
+      (!exigeJustificativa || justificativaValida) &&
+      !atualizandoStatus
 
     return (
       <section className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-800 p-4 shadow-xl sm:p-6">
@@ -236,11 +299,13 @@ export default function ListaEntregas({
                     ? 'bg-green-500'
                     : item.status_novo === 'Em rota'
                       ? 'bg-blue-500'
-                      : item.status_novo === 'Não entregue'
-                        ? 'bg-red-500'
-                        : item.status_novo === 'Cancelado'
-                          ? 'bg-zinc-500'
-                          : 'bg-yellow-500'
+                      : item.status_novo === 'Em separação'
+                        ? 'bg-yellow-500'
+                        : item.status_novo === 'Não entregue'
+                          ? 'bg-red-500'
+                          : item.status_novo === 'Cancelado'
+                            ? 'bg-zinc-500'
+                            : 'bg-yellow-500'
 
                 return (
                   <div
@@ -267,14 +332,24 @@ export default function ListaEntregas({
                       </p>
 
                       <p className="mt-2 text-sm text-zinc-300">
-                        Responsável:{' '}
-                        {usuario?.nome || 'Usuário não identificado'}
+                        Responsável: {usuario?.nome || 'Usuário não identificado'}
                       </p>
 
                       {usuario?.cargo && (
                         <span className="mt-1 inline-block rounded-md bg-zinc-800 px-2 py-1 text-xs text-zinc-400">
                           {usuario.cargo}
                         </span>
+                      )}
+
+                      {item.justificativa && (
+                        <div className="mt-3 rounded-lg border border-zinc-700 bg-zinc-800 p-3">
+                          <p className="text-xs font-semibold text-zinc-400">
+                            Justificativa
+                          </p>
+                          <p className="mt-1 break-words text-sm text-zinc-200">
+                            {item.justificativa}
+                          </p>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -284,24 +359,90 @@ export default function ListaEntregas({
           )}
         </div>
 
-        {/* Botões de atualização de situação */}
-        <div className="mt-6">
-          <p className="mb-3 text-sm font-semibold text-zinc-300">
+        {/* Atualização de situação */}
+        <div className="mt-6 rounded-xl border border-zinc-700 bg-zinc-900 p-4 sm:p-5">
+          <h3 className="mb-2 text-lg font-bold">
             Atualizar situação
+          </h3>
+
+          <p className="mb-4 text-sm text-zinc-400">
+            Selecione a nova situação da entrega e confirme a alteração.
           </p>
 
-          <div className="flex flex-wrap gap-2">
-            {['Em rota', 'Entregue', 'Não entregue'].map((status) => (
-              <button
-                key={status}
-                onClick={() => atualizarStatus(entrega.id, status)}
-                disabled={entrega.status === status}
-                className="rounded-lg bg-zinc-700 px-4 py-2 text-sm font-semibold transition hover:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {status}
-              </button>
-            ))}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {opcoesStatus.map((status) => {
+              const selecionado = statusSelecionado === status
+
+              return (
+                <label
+                  key={status}
+                  className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition ${selecionado
+                    ? 'border-blue-500 bg-blue-500/10 text-white'
+                    : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-zinc-500'
+                    }`}
+                >
+                  <input
+                    type="radio"
+                    name="status-entrega"
+                    value={status}
+                    checked={selecionado}
+                    onChange={() => {
+                      setStatusSelecionado(status)
+                      setJustificativaStatus('')
+                    }}
+                    disabled={atualizandoStatus}
+                    className="h-4 w-4 accent-blue-500"
+                  />
+
+                  <span className="text-sm font-semibold">
+                    {status}
+                  </span>
+
+                  {selecionado && (
+                    <span className="ml-auto text-xs text-blue-400">
+                      Selecionado
+                    </span>
+                  )}
+                </label>
+              )
+            })}
           </div>
+
+          {exigeJustificativa && (
+            <div className="mt-4">
+              <label
+                htmlFor="justificativa-status"
+                className="mb-2 block text-sm font-semibold text-zinc-300"
+              >
+                Justificativa obrigatória
+              </label>
+
+              <textarea
+                id="justificativa-status"
+                value={justificativaStatus}
+                onChange={(e) => setJustificativaStatus(e.target.value)}
+                placeholder="Informe o motivo pelo qual a entrega não foi realizada..."
+                rows={3}
+                disabled={atualizandoStatus}
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-3 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-blue-500"
+              />
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={confirmarAtualizacaoStatus}
+            disabled={!podeConfirmar}
+            className="mt-5 w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+          >
+            {atualizandoStatus ? 'Atualizando...' : 'Confirmar alteração'}
+          </button>
+
+          {statusSelecionado === entrega.status && (
+            <p className="mt-3 text-xs text-zinc-500">
+              Selecione uma situação diferente da atual para continuar.
+            </p>
+          )}
         </div>
 
         {/* Ações conforme o perfil */}
@@ -375,6 +516,7 @@ export default function ListaEntregas({
         >
           <option value="Todos">Todos os status</option>
           <option value="Pendente">Pendente</option>
+          <option value="Em separação">Em separação</option>
           <option value="Em rota">Em rota</option>
           <option value="Entregue">Entregue</option>
           <option value="Não entregue">Não entregue</option>
@@ -412,8 +554,7 @@ export default function ListaEntregas({
 
                 {entrega.created_at && (
                   <p className="mt-2 text-xs text-zinc-500">
-                    Cadastro:{' '}
-                    {new Date(entrega.created_at).toLocaleString('pt-BR')}
+                    Cadastro: {new Date(entrega.created_at).toLocaleString('pt-BR')}
                   </p>
                 )}
               </div>
