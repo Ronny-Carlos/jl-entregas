@@ -1,8 +1,10 @@
+
 'use client'
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import StatusEntrega from './StatusEntrega'
+import toast from 'react-hot-toast'
 
 type Props = {
   entregas: any[]
@@ -46,6 +48,7 @@ export default function ListaEntregas({
   const [statusSelecionado, setStatusSelecionado] = useState('')
   const [justificativaStatus, setJustificativaStatus] = useState('')
   const [atualizandoStatus, setAtualizandoStatus] = useState(false)
+  const [abrindoArquivo, setAbrindoArquivo] = useState(false)
 
   // Mantém os dados da entrega selecionada atualizados
   useEffect(() => {
@@ -62,7 +65,7 @@ export default function ListaEntregas({
     }
   }, [entregas, entregaSelecionada?.id])
 
-  // Atualiza a opção selecionada quando o status da entrega mudar
+  // Atualiza a opção selecionada quando o status mudar
   useEffect(() => {
     if (!entregaSelecionada) return
 
@@ -142,6 +145,35 @@ export default function ListaEntregas({
     }
   }, [entregaSelecionada?.id])
 
+  // Abre o documento privado da venda
+  async function visualizarArquivo(entrega: any) {
+    if (!entrega.arquivo_venda_path) {
+      toast.error('Esta entrega não possui arquivo anexado.')
+      return
+    }
+
+    setAbrindoArquivo(true)
+
+    try {
+      const { data, error } = await supabase.storage
+        .from('arquivos-vendas')
+        .createSignedUrl(entrega.arquivo_venda_path, 60)
+
+      if (error || !data?.signedUrl) {
+        console.error('Erro ao gerar acesso ao arquivo:', error)
+        toast.error('Não foi possível abrir o arquivo.')
+        return
+      }
+
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+    } catch (error) {
+      console.error('Erro ao visualizar arquivo:', error)
+      toast.error('Erro ao abrir o documento.')
+    } finally {
+      setAbrindoArquivo(false)
+    }
+  }
+
   async function confirmarAtualizacaoStatus() {
     if (!entregaSelecionada || !statusSelecionado) return
 
@@ -174,7 +206,8 @@ export default function ListaEntregas({
 
     const correspondePesquisa =
       entrega.cliente?.toLowerCase().includes(termo) ||
-      String(entrega.codigo_pedido || '').toLowerCase().includes(termo)
+      String(entrega.codigo_pedido || '').toLowerCase().includes(termo) ||
+      String(entrega.telefone || '').toLowerCase().includes(termo)
 
     const correspondeStatus =
       filtroStatus === 'Todos' || entrega.status === filtroStatus
@@ -237,6 +270,13 @@ export default function ListaEntregas({
           </div>
 
           <div className="min-w-0">
+            <p className="text-xs text-zinc-400">Telefone / WhatsApp</p>
+            <p className="mt-1 break-words font-semibold [overflow-wrap:anywhere]">
+              {entrega.telefone || 'Não informado'}
+            </p>
+          </div>
+
+          <div className="min-w-0">
             <p className="text-xs text-zinc-400">Endereço de entrega</p>
             <p className="mt-1 break-words font-semibold [overflow-wrap:anywhere]">
               {entrega.endereco || '—'}
@@ -267,6 +307,39 @@ export default function ListaEntregas({
               {entrega.observacao || 'Nenhuma observação'}
             </p>
           </div>
+        </div>
+
+        {/* Documento da venda */}
+        <div className="mt-5 rounded-xl border border-zinc-700 bg-zinc-900 p-4">
+          <p className="text-sm font-semibold text-white">
+            Documento da venda
+          </p>
+
+          {entrega.arquivo_venda_path ? (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="break-all text-sm text-zinc-300">
+                  {entrega.arquivo_venda_nome || 'Arquivo anexado'}
+                </p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Documento armazenado com acesso privado.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => visualizarArquivo(entrega)}
+                disabled={abrindoArquivo}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {abrindoArquivo ? 'Abrindo...' : 'Visualizar arquivo'}
+              </button>
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-zinc-400">
+              Nenhum documento anexado a esta entrega.
+            </p>
+          )}
         </div>
 
         {/* Histórico em linha do tempo */}
@@ -369,17 +442,18 @@ export default function ListaEntregas({
             Selecione a nova situação da entrega e confirme a alteração.
           </p>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="flex flex-wrap gap-2">
             {opcoesStatus.map((status) => {
               const selecionado = statusSelecionado === status
 
               return (
                 <label
                   key={status}
-                  className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition ${selecionado
-                    ? 'border-blue-500 bg-blue-500/10 text-white'
-                    : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-zinc-500'
-                    }`}
+                  className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 transition ${
+                    selecionado
+                      ? 'border-blue-500 bg-blue-500/10 text-white'
+                      : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-zinc-500'
+                  }`}
                 >
                   <input
                     type="radio"
@@ -394,15 +468,9 @@ export default function ListaEntregas({
                     className="h-4 w-4 accent-blue-500"
                   />
 
-                  <span className="text-sm font-semibold">
+                  <span className="whitespace-nowrap text-xs font-semibold sm:text-sm">
                     {status}
                   </span>
-
-                  {selecionado && (
-                    <span className="ml-auto text-xs text-blue-400">
-                      Selecionado
-                    </span>
-                  )}
                 </label>
               )
             })}
@@ -491,7 +559,7 @@ export default function ListaEntregas({
         <div className="relative min-w-0">
           <input
             type="text"
-            placeholder="Pesquisar por nome do cliente ou código da venda..."
+            placeholder="Pesquisar por cliente, telefone ou código da venda..."
             value={pesquisa}
             onChange={(e) => setPesquisa(e.target.value)}
             className="w-full min-w-0 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3.5 pr-12 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
@@ -548,9 +616,17 @@ export default function ListaEntregas({
                   {entrega.cliente || 'Cliente não informado'}
                 </p>
 
-                <p className="mt-1 break-words text-sm text-zinc-400 [overflow-wrap:anywhere]">
-                  {entrega.produto || 'Produto não informado'}
-                </p>
+                {entrega.telefone && (
+                  <p className="mt-1 break-words text-sm text-zinc-400 [overflow-wrap:anywhere]">
+                    Telefone: {entrega.telefone}
+                  </p>
+                )}
+
+                {entrega.produto && (
+                  <p className="mt-1 break-words text-sm text-zinc-400 [overflow-wrap:anywhere]">
+                    {entrega.produto}
+                  </p>
+                )}
 
                 {entrega.created_at && (
                   <p className="mt-2 text-xs text-zinc-500">
@@ -563,12 +639,21 @@ export default function ListaEntregas({
             </div>
 
             <div className="mt-3 flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-zinc-800 pt-3">
-              <p className="min-w-0 break-words text-sm text-zinc-400 [overflow-wrap:anywhere]">
-                Venda:{' '}
-                <span className="font-semibold text-zinc-200">
-                  {entrega.codigo_pedido || 'Sem código'}
-                </span>
-              </p>
+              <div className="flex min-w-0 flex-wrap items-center gap-3">
+                <p className="min-w-0 break-words text-sm text-zinc-400 [overflow-wrap:anywhere]">
+                  Venda:{' '}
+                  <span className="font-semibold text-zinc-200">
+                    {entrega.codigo_pedido || 'Sem código'}
+                  </span>
+                </p>
+
+                {entrega.arquivo_venda_path && (
+                  <span className="text-xs font-medium text-green-400">
+                    <span aria-hidden="true">📎 </span>
+                    Documento anexado
+                  </span>
+                )}
+              </div>
 
               <span className="shrink-0 text-sm font-semibold text-blue-400">
                 Ver detalhes →

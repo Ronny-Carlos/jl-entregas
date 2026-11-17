@@ -18,10 +18,11 @@ export default function Home() {
   const [perfil, setPerfil] = useState<any>(null)
 
   const [cliente, setCliente] = useState('')
+  const [telefone, setTelefone] = useState('')
   const [endereco, setEndereco] = useState('')
-  const [produto, setProduto] = useState('')
   const [codigoPedido, setCodigoPedido] = useState('')
   const [observacao, setObservacao] = useState('')
+  const [arquivoVenda, setArquivoVenda] = useState<File | null>(null)
 
   const [entregas, setEntregas] = useState<any[]>([])
   const [pesquisa, setPesquisa] = useState('')
@@ -138,36 +139,92 @@ export default function Home() {
   }
 
   async function cadastrarEntrega() {
-    const { error } = await supabase
-      .from('entregas')
-      .insert([
-        {
-          cliente,
-          endereco,
-          produto,
-          codigo_pedido: codigoPedido,
-          observacao,
-          status: 'Pendente',
-        },
-      ])
+  if (!cliente.trim() || !endereco.trim()) {
+    toast.error('Informe o nome do cliente e o endereço')
+    return
+  }
 
-    if (error) {
-      toast.error('Erro ao cadastrar entrega')
+  if (arquivoVenda) {
+    const tiposPermitidos = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+    ]
+
+    if (!tiposPermitidos.includes(arquivoVenda.type)) {
+      toast.error('Formato inválido. Envie PDF, JPG ou PNG.')
       return
     }
 
-    toast.success('Entrega cadastrada!')
-
-    setCliente('')
-    setEndereco('')
-    setProduto('')
-    setCodigoPedido('')
-    setObservacao('')
-
-    setModalNovaEntrega(false)
-
-    buscarEntregas()
+    if (arquivoVenda.size > 10 * 1024 * 1024) {
+      toast.error('O arquivo deve ter no máximo 10 MB.')
+      return
+    }
   }
+
+  const caminhoArquivo = arquivoVenda
+    ? `${crypto.randomUUID()}-${arquivoVenda.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+    : null
+
+  const { data, error } = await supabase
+    .from('entregas')
+    .insert({
+      cliente,
+      telefone,
+      endereco,
+      codigo_pedido: codigoPedido,
+      observacao,
+      status: 'Pendente',
+      arquivo_venda_path: caminhoArquivo,
+      arquivo_venda_nome: arquivoVenda?.name ?? null,
+    })
+    .select('id')
+    .single()
+
+  if (error) {
+    console.error('Erro ao cadastrar entrega:', error)
+    toast.error('Erro ao cadastrar entrega')
+    return
+  }
+
+  if (arquivoVenda && caminhoArquivo) {
+    const { error: erroUpload } = await supabase.storage
+      .from('arquivos-vendas')
+      .upload(caminhoArquivo, arquivoVenda, {
+        contentType: arquivoVenda.type,
+        upsert: false,
+      })
+
+    if (erroUpload) {
+      console.error('Erro ao enviar arquivo:', erroUpload)
+
+      await supabase
+        .from('entregas')
+        .update({
+          arquivo_venda_path: null,
+          arquivo_venda_nome: null,
+        })
+        .eq('id', data.id)
+
+      toast.error('Entrega cadastrada, mas houve erro ao enviar o arquivo.')
+    } else {
+      toast.success('Entrega e arquivo cadastrados!')
+    }
+  } else {
+    toast.success('Entrega cadastrada!')
+  }
+
+  setCliente('')
+  setTelefone('')
+  setEndereco('')
+  setCodigoPedido('')
+  setObservacao('')
+  setArquivoVenda(null)
+
+  setModalNovaEntrega(false)
+
+  await buscarEntregas()
+}
 
   // Atualiza o status e registra a justificativa, quando informada
   async function atualizarStatus(
@@ -320,15 +377,17 @@ export default function Home() {
 
             <FormEntrega
               cliente={cliente}
+              telefone={telefone}
               endereco={endereco}
-              produto={produto}
               codigoPedido={codigoPedido}
               observacao={observacao}
+              arquivoVenda={arquivoVenda}
               setCliente={setCliente}
+              setTelefone={setTelefone}
               setEndereco={setEndereco}
-              setProduto={setProduto}
               setCodigoPedido={setCodigoPedido}
               setObservacao={setObservacao}
+              setArquivoVenda={setArquivoVenda}
               cadastrarEntrega={cadastrarEntrega}
             />
           </div>
