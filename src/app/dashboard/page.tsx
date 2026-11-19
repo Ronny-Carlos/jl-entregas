@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast, { Toaster } from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
+
 import CardsDashboard from '@/components/dashboard/CardsDashboard'
 import FormEntrega from '@/components/dashboard/FormEntrega'
 import ListaEntregas from '@/components/dashboard/ListaEntregas'
@@ -16,6 +17,7 @@ export default function Home() {
 
   const [usuario, setUsuario] = useState<any>(null)
   const [perfil, setPerfil] = useState<any>(null)
+  const [nomeEmpresa, setNomeEmpresa] = useState('')
 
   const [cliente, setCliente] = useState('')
   const [telefone, setTelefone] = useState('')
@@ -39,6 +41,28 @@ export default function Home() {
   const [novoCodigoPedido, setNovoCodigoPedido] = useState('')
   const [novaObservacao, setNovaObservacao] = useState('')
 
+  // Busca o nome da empresa vinculada ao usuário
+  async function buscarNomeEmpresa(empresaId: string | null) {
+    if (!empresaId) {
+      setNomeEmpresa('')
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('empresas')
+      .select('nome')
+      .eq('id', empresaId)
+      .single()
+
+    if (error) {
+      console.error('Erro ao buscar nome da empresa:', error)
+      setNomeEmpresa('')
+      return
+    }
+
+    setNomeEmpresa(data?.nome || '')
+  }
+
   useEffect(() => {
     let ativo = true
     let timeoutId: ReturnType<typeof setTimeout> | undefined
@@ -53,6 +77,8 @@ export default function Home() {
       if (!ativo) return
 
       setPerfil(data)
+      await buscarNomeEmpresa(data?.empresa_id ?? null)
+
       await buscarEntregas()
     }
 
@@ -64,6 +90,7 @@ export default function Home() {
       if (!session?.user) {
         setUsuario(null)
         setPerfil(null)
+        setNomeEmpresa('')
         setEntregas([])
         router.push('/login')
         return
@@ -110,6 +137,7 @@ export default function Home() {
       .single()
 
     setPerfil(data)
+    await buscarNomeEmpresa(data?.empresa_id ?? null)
   }
 
   async function logout() {
@@ -117,6 +145,7 @@ export default function Home() {
 
     setUsuario(null)
     setPerfil(null)
+    setNomeEmpresa('')
 
     toast.success('Logout realizado!')
 
@@ -139,92 +168,116 @@ export default function Home() {
   }
 
   async function cadastrarEntrega() {
-  if (!cliente.trim() || !endereco.trim()) {
-    toast.error('Informe o nome do cliente e o endereço')
-    return
-  }
-
-  if (arquivoVenda) {
-    const tiposPermitidos = [
-      'application/pdf',
-      'image/jpeg',
-      'image/png',
-    ]
-
-    if (!tiposPermitidos.includes(arquivoVenda.type)) {
-      toast.error('Formato inválido. Envie PDF, JPG ou PNG.')
+    // Verifica se o perfil possui uma empresa vinculada
+    if (!perfil?.empresa_id) {
+      toast.error('Não foi possível identificar a empresa do usuário.')
+      console.error('Perfil sem empresa_id:', perfil)
       return
     }
 
-    if (arquivoVenda.size > 10 * 1024 * 1024) {
-      toast.error('O arquivo deve ter no máximo 10 MB.')
+    // Somente master e vendedor podem cadastrar entregas
+    if (!['master', 'vendedor'].includes(perfil.cargo)) {
+      toast.error('Seu perfil não tem permissão para cadastrar entregas.')
       return
     }
-  }
 
-  const caminhoArquivo = arquivoVenda
-    ? `${crypto.randomUUID()}-${arquivoVenda.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-    : null
+    if (!cliente.trim() || !endereco.trim()) {
+      toast.error('Informe o nome do cliente e o endereço')
+      return
+    }
 
-  const { data, error } = await supabase
-    .from('entregas')
-    .insert({
-      cliente,
-      telefone,
-      endereco,
-      codigo_pedido: codigoPedido,
-      observacao,
-      status: 'Pendente',
-      arquivo_venda_path: caminhoArquivo,
-      arquivo_venda_nome: arquivoVenda?.name ?? null,
-    })
-    .select('id')
-    .single()
+    // Valida o arquivo de venda, quando selecionado
+    if (arquivoVenda) {
+      const tiposPermitidos = [
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+      ]
 
-  if (error) {
-    console.error('Erro ao cadastrar entrega:', error)
-    toast.error('Erro ao cadastrar entrega')
-    return
-  }
+      if (!tiposPermitidos.includes(arquivoVenda.type)) {
+        toast.error('Formato inválido. Envie PDF, JPG ou PNG.')
+        return
+      }
 
-  if (arquivoVenda && caminhoArquivo) {
-    const { error: erroUpload } = await supabase.storage
-      .from('arquivos-vendas')
-      .upload(caminhoArquivo, arquivoVenda, {
-        contentType: arquivoVenda.type,
-        upsert: false,
+      if (arquivoVenda.size > 10 * 1024 * 1024) {
+        toast.error('O arquivo deve ter no máximo 10 MB.')
+        return
+      }
+    }
+
+    // Caminho do arquivo separado por empresa
+    const caminhoArquivo = arquivoVenda
+      ? `${perfil.empresa_id}/${crypto.randomUUID()}-${arquivoVenda.name.replace(/[^a-zA-Z0-9.\\_-]/g, '_')}`
+      : null
+
+    // Cadastra a entrega vinculada à empresa do usuário
+    const { data, error } = await supabase
+      .from('entregas')
+      .insert({
+        empresa_id: perfil.empresa_id,
+        cliente,
+        telefone,
+        endereco,
+        codigo_pedido: codigoPedido,
+        observacao,
+        status: 'Pendente',
+        arquivo_venda_path: caminhoArquivo,
+        arquivo_venda_nome: arquivoVenda?.name ?? null,
       })
+      .select('id')
+      .single()
 
-    if (erroUpload) {
-      console.error('Erro ao enviar arquivo:', erroUpload)
-
-      await supabase
-        .from('entregas')
-        .update({
-          arquivo_venda_path: null,
-          arquivo_venda_nome: null,
-        })
-        .eq('id', data.id)
-
-      toast.error('Entrega cadastrada, mas houve erro ao enviar o arquivo.')
-    } else {
-      toast.success('Entrega e arquivo cadastrados!')
+    if (error) {
+      console.error('Erro ao cadastrar entrega:', error)
+      toast.error(`Erro ao cadastrar: ${error.message}`)
+      return
     }
-  } else {
-    toast.success('Entrega cadastrada!')
+
+    // Envia o arquivo após o cadastro da entrega
+    if (arquivoVenda && caminhoArquivo) {
+      const { error: erroUpload } = await supabase.storage
+        .from('arquivos-vendas')
+        .upload(caminhoArquivo, arquivoVenda, {
+          contentType: arquivoVenda.type,
+          upsert: false,
+        })
+
+      if (erroUpload) {
+        console.error('Erro ao enviar arquivo:', erroUpload)
+
+        // Remove a referência ao arquivo caso o upload falhe
+        const { error: erroLimpeza } = await supabase
+          .from('entregas')
+          .update({
+            arquivo_venda_path: null,
+            arquivo_venda_nome: null,
+          })
+          .eq('id', data.id)
+
+        if (erroLimpeza) {
+          console.error('Erro ao limpar referência do arquivo:', erroLimpeza)
+        }
+
+        toast.error('Entrega cadastrada, mas houve erro ao enviar o arquivo.')
+      } else {
+        toast.success('Entrega e arquivo cadastrados!')
+      }
+    } else {
+      toast.success('Entrega cadastrada!')
+    }
+
+    // Limpa os campos do formulário
+    setCliente('')
+    setTelefone('')
+    setEndereco('')
+    setCodigoPedido('')
+    setObservacao('')
+    setArquivoVenda(null)
+
+    setModalNovaEntrega(false)
+
+    await buscarEntregas()
   }
-
-  setCliente('')
-  setTelefone('')
-  setEndereco('')
-  setCodigoPedido('')
-  setObservacao('')
-  setArquivoVenda(null)
-
-  setModalNovaEntrega(false)
-
-  await buscarEntregas()
-}
 
   // Atualiza o status e registra a justificativa, quando informada
   async function atualizarStatus(
@@ -317,7 +370,7 @@ export default function Home() {
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold md:text-5xl">
-              4RP Entregas 🚚
+              {nomeEmpresa || '4RP Entregas'} 🚚
             </h1>
 
             <p className="mt-2 text-zinc-400">
