@@ -68,36 +68,47 @@ export default function UsuariosPage() {
     setUsuarios((data as Usuario[]) || [])
   }
 
-  async function criarUsuario() {
-    const response = await fetch('/api/criar-usuario', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        nome,
-        email,
-        senha,
-        cargo,
-      }),
-    })
+  
+async function criarUsuario() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
 
-    const resultado = await response.json()
-
-    if (!response.ok) {
-      toast.error(resultado.error)
-      return
-    }
-
-    toast.success('Usuário criado!')
-
-    setNome('')
-    setEmail('')
-    setSenha('')
-    setCargo('vendedor')
-
-    buscarUsuarios()
+  if (!session) {
+    toast.error('Sua sessão expirou. Faça login novamente.')
+    return
   }
+
+  const response = await fetch('/api/criar-usuario', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({
+      nome,
+      email,
+      senha,
+      cargo,
+    }),
+  })
+
+  const resultado = await response.json()
+
+  if (!response.ok) {
+    toast.error(resultado.error || 'Erro ao criar usuário.')
+    return
+  }
+
+  toast.success('Usuário criado!')
+
+  setNome('')
+  setEmail('')
+  setSenha('')
+  setCargo('vendedor')
+
+  await buscarUsuarios()
+}
 
   async function alterarStatus(id: string, ativo: boolean) {
     const { error } = await supabase
